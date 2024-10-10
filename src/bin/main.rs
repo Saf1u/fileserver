@@ -16,7 +16,7 @@ fn main() {
         fileserver::cleanup_server_file(CONF_FOLDER_NAME);
     };
 
-    // TODO: 
+    // TODO: spawn a signal handler to allow shutdowns to cleanup gracefully
     cleanup();
 
 }
