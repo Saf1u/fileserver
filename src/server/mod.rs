@@ -1,9 +1,9 @@
 use std::{
     fmt,
-    io::{BufRead, BufReader, Write, self, Error, Read},
+    io::{BufRead, BufReader, Write, Read},
     net::{TcpListener, TcpStream},
     sync::{Arc, Mutex},
-    thread, time,
+    thread, time, collections::HashMap,
 };
 use crate::reader::fetch_file_buffer;
 
@@ -20,6 +20,7 @@ static FILE_MATCHER: Lazy<Regex> = Lazy::new(|| {
 pub enum FileServerError {
     FailedToInitFTPServer(String),
     FailedToParseRequest(String),
+    FailedToParseCommand(String),
     ServerReadError(String),
 }
 
@@ -32,14 +33,26 @@ impl fmt::Display for FileServerError {
             FileServerError::FailedToParseRequest(reason) => {
                 return write!(f, "Could not parse filename in request: {}", reason)
             }
+
+            FileServerError::FailedToParseCommand(reason) => {
+                return write!(f, "Could not parse command in request: {}", reason)
+            }
             FileServerError::ServerReadError(_) => return write!(f, "Client read deadline"),
         }
     }
 }
 
+#[derive(Eq, Hash, PartialEq,Clone,Copy,Debug)]
+pub enum CommandType {
+    Upload,
+    Download,
+    Statistics,
+}
+
 pub struct FileServer {
     thread_pool: Arc<Mutex<i32>>,
     listiner: TcpListener,
+    handlers:  HashMap<CommandType, fn(stream:&TcpStream)>
 }
 
 impl FileServer {
@@ -52,6 +65,7 @@ impl FileServer {
                 return Ok(FileServer {
                     thread_pool: Arc::new(Mutex::new(thread_count)),
                     listiner: listener,
+                    handlers: HashMap::new()
                 })
             }
         }
@@ -64,7 +78,7 @@ impl FileServer {
         });
     }
 
-    pub fn parse_incomming_file_request(mut stream:&TcpStream){
+    pub fn handle_incomming_file_request(mut stream:&TcpStream){
         let mut buffer = Vec::new();
         let mut reader = BufReader::new(stream);
         if let Err(err) = reader.read_until(b'|', &mut buffer) {
@@ -124,7 +138,43 @@ impl FileServer {
         }
     }
 
-    pub fn handle_incomming_connections(&self,handler:fn (stream: &TcpStream)) {
+    fn determine_handler(&self,mut stream: &TcpStream) -> Result< fn(stream:&TcpStream),FileServerError>{
+        let mut client_command_byte: [u8;1] = [0];
+        if let Err(err)  = stream.read(&mut client_command_byte) {
+            return Err(FileServerError::FailedToParseCommand(err.to_string()));
+        }
+
+        let command: CommandType;
+
+        match  client_command_byte[0] {
+            1 => {
+                command = CommandType::Download;
+            },
+            2 => {
+                panic!("upload not implemented")
+            },
+            3 => {
+                panic!("stats not implemented")
+            }
+
+            _ =>{
+                panic!("not implemented")
+            }
+
+        }
+
+        let handler  = self.handlers.get(&command);
+
+        if let None = handler{
+            return Err(FileServerError::FailedToParseCommand("unsupported command type".to_owned()));
+        }
+
+        return Ok(handler.unwrap().clone());
+
+
+    }
+
+    pub fn handle_incomming_connections(&self) {
         for stream in self.listiner.incoming() {
             // look for a free thread
             loop {
@@ -140,13 +190,30 @@ impl FileServer {
             }
             let mutex_ref = self.thread_pool.clone();
             println!("Handling incoming connection .....");
-            thread::spawn(move || {
-                let mut stream = stream.unwrap();
-                stream.set_read_timeout(None).unwrap();
-                let _ = handler(& mut stream);
-                let mut count = mutex_ref.lock().unwrap();
-                *count = *count + 1;
-            });
+            let mut stream = stream.unwrap();
+            match self.determine_handler(&stream){
+                Ok(handler) => {
+                    thread::spawn(move || {
+                        stream.set_read_timeout(None).unwrap();
+                        let _ = handler(& mut stream);
+                        let mut count = mutex_ref.lock().unwrap();
+                        *count = *count + 1;
+                    });
+                },
+                Err(error) => {
+                    Self::report_error_to_client(&stream,error.to_string());
+                    let mut count = mutex_ref.lock().unwrap();
+                    *count = *count + 1;
+                }
+            }
+
+        }
+    }
+
+    pub fn register_handlers(&mut self,handlers: &[(CommandType,fn(stream:&TcpStream))]) {
+        for (command, handler) in handlers {
+            println!("Registering {:?} handler...",command);
+            self.handlers.insert(*command, *handler);
         }
     }
 
