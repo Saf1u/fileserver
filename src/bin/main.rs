@@ -16,6 +16,7 @@ fn main() {
         fileserver::cleanup_server_file(CONF_FOLDER_NAME);
     };
 
+    // TODO: 
     cleanup();
 
 }
