@@ -1,12 +1,5 @@
 use std::{fs::{self, File}, io::{BufReader, self}};
-/// sets up a directory at tmp to server/store files from.
-/// panics if directory setup fails.
-/// # Examples
-///
-/// ```
-/// let result = add(2, 3);
-/// assert_eq!(result, 5);
-/// ```
+
 pub fn configure_directory_to_serve_file(dir:&str) -> String{
     let path = format!("/tmp/{dir}");
     fs::create_dir_all(path.clone()).unwrap();
