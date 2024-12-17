@@ -1,5 +1,5 @@
-use fileserver::server::FileServer as server;
-use fileserver::server::CommandType as commands;
+use fileserver::server::server::FileServer as server;
+use fileserver::server::types::CommandType as commands;
 
 static CONF_FOLDER_NAME:&str = "rust_file_server";
 static CONF_PORT: &str =  "8089";
