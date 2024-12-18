@@ -15,6 +15,7 @@ pub struct FileServer {
     thread_pool: Arc<Mutex<i32>>,
     listiner: TcpListener,
     handlers: HashMap<CommandType, fn(stream: &TcpStream, root_dir: &'static str)>,
+    active_connections: i64,
     root_dir: &'static str,
     file_stat: Arc<RwLock<HashMap<String, i64>>>, // TODO: I pass this config to each handler function, I think this is a bit impure.
                                                   // I would like to bootstrap the function in a closure somehow to refrence the config or use globabl configs somehow.
@@ -66,6 +67,7 @@ impl FileServer {
                 thread_pool: Arc::new(Mutex::new(thread_count)),
                 listiner: listener,
                 handlers: HashMap::new(),
+                active_connections: 0,
                 root_dir,
                 file_stat: Arc::new(RwLock::new(HashMap::new())),
             }),
