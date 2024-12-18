@@ -1,9 +1,10 @@
-pub mod server;
+
 // do not make public as a lib
+mod server;
 mod reader;
 // reexport only what I want
 pub use reader::{configure_directory_to_serve_file,cleanup_server_file};
-
+pub use server::{types::CommandType,server::FileServer};
 
 // reexport modules for external usage like so
 // use $crate_name::server::$file_server_type/trait/function;

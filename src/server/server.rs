@@ -2,7 +2,7 @@ use std::{
     fmt,
     io::{BufRead, BufReader, Write, Read},
     net::{TcpListener, TcpStream},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
     thread, time, collections::HashMap
 };
 use crate::reader::fetch_file_buffer;
@@ -15,6 +15,7 @@ pub struct FileServer {
     listiner: TcpListener,
     handlers:  HashMap<CommandType, fn(stream:&TcpStream,root_dir:&'static str)>,
     root_dir: &'static str,
+    file_stat: Arc<RwLock<HashMap<String,i64>>>
     // TODO: I pass this config to each handler function, I think this is a bit impure.
     // I would like to bootstrap the function in a closure somehow to refrence the config or use globabl configs somehow.
 }
@@ -61,7 +62,8 @@ impl FileServer {
                      thread_pool: Arc::new(Mutex::new(thread_count)),
                      listiner: listener,
                      handlers: HashMap::new(),
-                     root_dir: root_dir
+                     root_dir: root_dir,
+                     file_stat:Arc::new(RwLock::new(HashMap::new()))
                  })
              }
          }
@@ -74,6 +76,20 @@ impl FileServer {
          });
      }
 
+     pub fn update_count(&self,file_name:String){
+       let mut stats  = self.file_stat.write().unwrap();
+       if let Some(x) = stats.get_mut(&file_name) {
+        *x = (*x)+1;
+       }else{
+        stats.insert(file_name, 1);
+       }
+
+    }
+
+     // NOTE: I do not mind the root_dir being part of all handelr signatures
+     // want to avoid gloabls, and creating an object when not ready
+     // ideally the 2nd param would be a context with key-value relevant stuff
+     // but not really needed right now :)
      pub fn handle_incomming_file_request(mut stream:&TcpStream, root_dir:&'static str){
          let mut buffer = Vec::new();
          let mut reader = BufReader::new(stream);
