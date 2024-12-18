@@ -37,16 +37,16 @@ impl fmt::Display for FileServerError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             FileServerError::FailedToInitFTPServer(reason) => {
-                return write!(f, "Could not init FTPServer: {}", reason)
+                write!(f, "Could not init FTPServer: {}", reason)
             }
             FileServerError::FailedToParseRequest(reason) => {
-                return write!(f, "Could not parse filename in request: {}", reason)
+                write!(f, "Could not parse filename in request: {}", reason)
             }
 
             FileServerError::FailedToParseCommand(reason) => {
-                return write!(f, "Could not parse command in request: {}", reason)
+                write!(f, "Could not parse command in request: {}", reason)
             }
-            FileServerError::ServerReadError(_) => return write!(f, "Client read deadline"),
+            FileServerError::ServerReadError(_) => write!(f, "Client read deadline"),
         }
     }
 }
@@ -58,11 +58,11 @@ impl FileServer {
          match listener {
              Err(err) => Err(FileServerError::FailedToInitFTPServer(err.to_string())),
              Ok(listener) => {
-                 return Ok(FileServer {
+                 Ok(FileServer {
                      thread_pool: Arc::new(Mutex::new(thread_count)),
                      listiner: listener,
                      handlers: HashMap::new(),
-                     root_dir: root_dir,
+                     root_dir,
                      file_stat:Arc::new(RwLock::new(HashMap::new()))
                  })
              }
@@ -79,7 +79,7 @@ impl FileServer {
      pub fn update_count(&self,file_name:String){
        let mut stats  = self.file_stat.write().unwrap();
        if let Some(x) = stats.get_mut(&file_name) {
-        *x = (*x)+1;
+        *x += 1;
        }else{
         stats.insert(file_name, 1);
        }
@@ -151,7 +151,7 @@ impl FileServer {
      }
 
 
-     pub fn handle_server_stats_request(mut stream:&TcpStream, root_dir:&'static str){
+     pub fn handle_server_stats_request(stream:&TcpStream, root_dir:&'static str){
 
      }
 
@@ -181,11 +181,11 @@ impl FileServer {
 
          let handler  = self.handlers.get(&command);
 
-         if let None = handler{
+         if handler.is_none(){
              return Err(FileServerError::FailedToParseCommand("unsupported command type".to_owned()));
          }
 
-         return Ok(handler.unwrap().clone());
+         Ok(*handler.unwrap())
 
 
      }
@@ -199,7 +199,7 @@ impl FileServer {
                      drop(count);
                      thread::sleep(time::Duration::from_millis(6000));
                  } else {
-                     *count = *count - 1;
+                     *count -= 1;
                      drop(count);
                      break;
                  }
@@ -212,15 +212,15 @@ impl FileServer {
                      let root_dir = self.root_dir;
                      thread::spawn(move || {
                          stream.set_read_timeout(None).unwrap();
-                         let _ = handler(& mut stream,root_dir);
+                         handler(& mut stream,root_dir);
                          let mut count = mutex_ref.lock().unwrap();
-                         *count = *count + 1;
+                         *count += 1;
                      });
                  },
                  Err(error) => {
                      Self::report_error_to_client(&stream,error.to_string());
                      let mut count = mutex_ref.lock().unwrap();
-                     *count = *count + 1;
+                     *count += 1;
                  }
              }
 
@@ -254,7 +254,7 @@ impl FileServer {
      fn setup_file_server(addr:&str,port:&str,threads:i32,handlers:&[(CommandType,fn(stream:&TcpStream,root_dir:&'static str))],root_dir:&'static str) -> FileServer {
          let mut file_server = FileServer::new(addr, port, threads,root_dir).unwrap();
          file_server.register_handlers(handlers);
-         return file_server;
+         file_server
      }
      use std::{net::TcpStream, io::{Write, Read}};
 
