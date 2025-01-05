@@ -8,7 +8,12 @@ fn main() {
     fileserver::configure_directory_to_serve_file(CONF_FOLDER_NAME);
     println!("Starting TCP server!!!");
     let mut file_server = server::new(CONF_ADDRESS, CONF_PORT, 10, CONF_FOLDER_NAME).unwrap();
-    file_server.register_handlers(&[(commands::Download, server::handle_incomming_file_request)]);
+    file_server.register_handlers(&[
+        (commands::Download, server::handle_incomming_file_request),
+        (commands::Statistics, server::no_op_handler),
+    ]);
+
+    file_server.start_metrics_report();
     file_server.handle_incomming_connections();
 
     let cleanup = || {

@@ -40,4 +40,4 @@ jobs:
 
     # Run the tests
     - name: Run tests
-      run: cargo test --all --verbose
+      run: cargo test --all --verbose -- --test-threads=1
